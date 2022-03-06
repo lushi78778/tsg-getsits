@@ -10,10 +10,7 @@ import cn.hutool.json.JSONUtil;
 import lombok.SneakyThrows;
 
 import org.checkerframework.checker.units.qual.A;
-import org.openqa.selenium.By;
-import org.openqa.selenium.Cookie;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.Wait;
@@ -27,6 +24,7 @@ import top.lushi78778.tsg.entity.User;
 import top.lushi78778.tsg.model.CookieOwn;
 
 import javax.annotation.Resource;
+import java.net.URI;
 import java.sql.SQLException;
 import java.util.*;
 
@@ -51,8 +49,9 @@ public class SitTask implements Job {
 
     @SneakyThrows
     public void execute(JobExecutionContext jobExecutionContext) {
-
         for (User user: userDao.getAll()){
+            Dimension targetSize = new Dimension(460, 900);  //设置窗口大小为1024*768
+            browser.manage().window().setSize(targetSize);
             //开启线程
             ThreadUtil.execute(() -> {
                 while (true) {
@@ -62,8 +61,6 @@ public class SitTask implements Job {
                             logger.info(user.getPhone() + "登陆成功，开始作业");
                             if (login_crouse(user) == 1) {
                                 logger.info(user.getPhone() + "预约成功");
-                            }else {
-                                break;
                             }
                         }
                         //获取刚刚更新的cookies
@@ -85,22 +82,24 @@ public class SitTask implements Job {
     public Integer get_login(User user) throws InterruptedException, SQLException {
         if (user.getCookies() != null) {
             //debug：cookie无效的作用域，以下均无效
-            browser.get(url);
+            browser.get("https://office.chaoxing.com/");
             //直接有cookies
             JSONArray array = JSONUtil.parseArray(user.getCookies());
+            logger.info(array.toString());
             List<CookieOwn> cookieList = JSONUtil.toList(array, CookieOwn.class);
             logger.info("获取cookie登录:"+cookieList);
             for (CookieOwn cookie : cookieList) {
                 browser.manage().addCookie(
                         new Cookie(
                                 cookie.getName(), cookie.getValue(),
-                                cookie.getDomain(), cookie.getPath(),
+                                ".chaoxing.com", cookie.getPath(),
                                 cookie.getExpiry(),
                                 cookie.isSecure(), cookie.isHttpOnly()));
             }
             browser.get(url);
+            logger.info(browser.manage().getCookies().toString());
             Wait<WebDriver> wait = new WebDriverWait(browser, 5);
-            WebElement element = wait.until(visibilityOfElementLocated(By.className("lg-container")));
+            WebElement element = wait.until(visibilityOfElementLocated(By.className("sind_top_word")));
             if (element != null) return 1;
             return 0;
         } else {
@@ -115,10 +114,8 @@ public class SitTask implements Job {
             browser.findElement(By.className("ipt-tel")).sendKeys(user.getPhone());
             browser.findElement(By.className("ipt-pwd")).sendKeys(user.getPassword());
             Thread.sleep(1000);
-            //xpath有问题
             browser.findElement(By.xpath("//*[@id=\"loginBtn\"]")).click();
             Thread.sleep(1000);
-            browser.findElement(By.className("sind_top_word"));
             Wait<WebDriver> wait = new WebDriverWait(browser, 5);
             WebElement element = wait.until(visibilityOfElementLocated(By.className("sind_top_word")));
             if (element != null) {
@@ -129,7 +126,7 @@ public class SitTask implements Job {
                 }
                 user.setCookies(String.valueOf(cookie));
                 logger.info(user.getPhone() + "cookies获取成功" + cookie);
-//                userDao.updateCookie(user);
+                userDao.updateCookie(user);
                 return 1;
             }
             return 0;
@@ -144,26 +141,28 @@ public class SitTask implements Job {
      */
     public int login_crouse(User user) throws InterruptedException {
         browser.get(url);
-        Thread.sleep(3000);
+        Thread.sleep(200);
         //弹窗
         browser.findElement(By.className("rp_sure")).click();
-        Thread.sleep(3000);
+        Thread.sleep(100);
         //预约选座
         browser.findElement(By.className("sind_top_word")).click();
-        Thread.sleep(3000);
+        Thread.sleep(200);
         //选房间
         browser.findElement(By.xpath("/html/body/div/ul[1]/li["+user.getRoom()+"]/span")).click();
-        //选时间，正常顺序
-        WebElement chart = browser.findElement(By.className("time_cell"));
-//        chart[2].click();
-        browser.findElement(By.xpath("/html/body/div/div[5]/ul/li["+user.getStartTime()+"]")).click();
-        browser.findElement(By.xpath("/html/body/div/div[5]/ul/li["+user.getStopTime()+"]")).click();
-        Thread.sleep(3000);
+        Thread.sleep(200);
+        //选时间，正常顺序-1 数组的索引值从 0 开始
+        List<WebElement> chart = browser.findElements(By.className("time_cell"));
+        logger.info(String.valueOf(chart.size()));
+        chart.get(user.getStartTime()).click();
+        if (!Objects.equals(user.getStartTime(), user.getStopTime())) chart.get(user.getStopTime()).click();
+        Thread.sleep(200);
         //确认时间
-        browser.findElement(By.className("time_sure"));
+        browser.findElement(By.xpath("/html/body/div/div[5]/div[1]/span[3]")).click();
+        Thread.sleep(200);
         //选座位，正常顺序
         browser.findElement(By.xpath("/html/body/div/div[2]/ul/li["+user.getSit()+"]/span")).click();
-        Thread.sleep(3000);
+        Thread.sleep(100);
         //确认座位
         browser.findElement(By.className("order_bottom")).click();
         return 1;

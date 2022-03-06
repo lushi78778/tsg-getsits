@@ -20,7 +20,7 @@ public class TsgGetsitsJavaApplication {
         JobDetail jobDetail = JobBuilder.newJob(SitTask.class)
                 .withIdentity("job1", "group1").build();
 //        CronScheduleBuilder builder = CronScheduleBuilder.cronSchedule("0 58 6 * * ? ");
-        CronScheduleBuilder builder = CronScheduleBuilder.cronSchedule("40 08 11 * * ? ");
+        CronScheduleBuilder builder = CronScheduleBuilder.cronSchedule("00 20 13 * * ? ");
         Trigger trigger = TriggerBuilder.newTrigger().withIdentity("trigger", "triggerGroup")
                 .startNow()
                 .withSchedule(builder).build();
